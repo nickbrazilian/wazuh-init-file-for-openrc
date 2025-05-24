@@ -1,0 +1,48 @@
+#!/sbin/openrc-run
+
+name="wazuh-manager"
+description="Wazuh Manager HIDS"
+
+# Define o caminho para o script de controle do Wazuh
+WAZUH_CONTROL="/var/ossec/bin/wazuh-control"
+# Wazuh já gerencia seu próprio PID file, que é importante para o status
+PID_FILE="/var/ossec/var/ossec.pid"
+
+depend() {
+    after net
+    need localmount
+}
+
+start() {
+    ebegin "Starting Wazuh Manager"
+    # Chama o script de controle do Wazuh para iniciar os serviços
+    # Ele já lida com o forking para segundo plano e o PID file
+    ${WAZUH_CONTROL} start
+    # eend $? verifica o status de saída do comando anterior
+    eend $?
+}
+
+stop() {
+    ebegin "Stopping Wazuh Manager"
+    # Chama o script de controle do Wazuh para parar os serviços
+    ${WAZUH_CONTROL} stop
+    eend $?
+}
+
+status() {
+    # Chama o comando de status do próprio Wazuh, que é mais preciso
+    # ou verifica se o PID file existe e o processo está ativo
+    if [ -f "${PID_FILE}" ]; then
+        if ps -p $(cat "${PID_FILE}") > /dev/null; then
+            ewarn "Wazuh Manager is running (PID: $(cat "${PID_FILE}"))"
+            return 0 # Success
+        else
+            eerror "Wazuh Manager PID file exists but process not found."
+            rm -f "${PID_FILE}" # Remove stale PID file
+            return 1 # Failure
+        fi
+    else
+        eerror "Wazuh Manager is not running (PID file not found)."
+        return 1 # Failure
+    fi
+}
