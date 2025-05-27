@@ -1,0 +1,71 @@
+#!/sbin/openrc-run
+
+# OpenRC init script for Wazuh Agent
+
+# Service Name and Description
+name="wazuh-agent"
+description="Wazuh Host-based Intrusion Detection System Agent"
+
+# Path to the Wazuh Agent daemon executable
+# The agent daemon is typically named 'wazuh-agentd'
+command="/var/ossec/bin/wazuh-agentd"
+
+# Arguments to pass to the command for daemonizing
+# -D: run as a daemon (daemonize)
+command_args=""
+
+# PID file used by the wazuh-agentd process
+# This is usually created by the agent itself
+pidfile="/var/ossec/var/ossec-agentd.pid"
+
+# Arguments passed to start-stop-daemon, which manages the process
+# --exec: specifies the executable to search for or run
+# --pidfile: specifies the PID file that start-stop-daemon should use
+start_stop_daemon_args="--exec ${command} --pidfile ${pidfile}"
+
+# Dependencies: Define what services must be running before the Wazuh agent starts
+depend() {
+    # Requires network connectivity to communicate with the manager
+    need net
+    # Requires local filesystems to be mounted (for monitoring logs, files, etc.)
+    need localmount
+    # Should start after logging services are available
+    after logger
+}
+
+# Start function: Defines how the service is initiated
+start() {
+    ebegin "Starting ${name}"
+    # Ensure OSSEC_HOME environment variable is correctly set for the Wazuh process
+    export OSSEC_HOME="/var/ossec"
+    # Use start-stop-daemon to manage the process:
+    # --start: instructs it to start the process
+    # -- : separates start-stop-daemon arguments from command arguments
+    start-stop-daemon --start ${start_stop_daemon_args} -- ${command_args}
+    eend $?
+}
+
+# Stop function: Defines how the service is terminated
+stop() {
+    ebegin "Stopping ${name}"
+    # --stop: instructs it to stop the process
+    start-stop-daemon --stop ${start_stop_daemon_args}
+    eend $?
+}
+
+# Reload function (Optional but Recommended for Wazuh Agents)
+# This sends a SIGHUP signal to the agent, causing it to reload its configuration
+# (e.g., changes made to ossec.conf) without requiring a full restart.
+reload() {
+    ebegin "Reloading ${name} configuration"
+    # --signal HUP: sends the HUP (Hang Up) signal
+    start-stop-daemon --stop --signal HUP ${start_stop_daemon_args}
+    eend $?
+}
+
+# Status function (Optional but useful for checking service state)
+# Provides information on whether the service is currently running
+status() {
+    start-stop-daemon --status ${start_stop_daemon_args}
+    return $?
+}
